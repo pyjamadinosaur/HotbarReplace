@@ -4,9 +4,7 @@
   "compatibilityLevel": "JAVA_21",
   "mixins": [],
   "client": [
-    "BlockItemMixin",
-    "BoneMealItemMixin",
-    "MinecartItemMixin"
+    "BlockItemMixin"
   ],
   "injectors": {
     "defaultRequire": 1
