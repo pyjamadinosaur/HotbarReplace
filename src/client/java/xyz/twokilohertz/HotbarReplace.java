@@ -1,12 +1,11 @@
 package xyz.twokilohertz;
 
 import net.fabricmc.api.ClientModInitializer;
+import net.minecraft.block.ShulkerBoxBlock;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.entity.player.PlayerInventory;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemPlacementContext;
-import net.minecraft.item.ItemUsageContext;
+import net.minecraft.item.*;
 import net.minecraft.screen.slot.SlotActionType;
 import net.minecraft.util.Hand;
 import org.lwjgl.glfw.GLFW;
@@ -24,13 +23,13 @@ public class HotbarReplace implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
-        LOGGER.info("HotbarReplace v0.1.3 initialised");
+        LOGGER.info("HotbarReplace v0.1.4 initialised");
     }
 
     public static void tryReplaceSlot(ItemUsageContext context, Item item, Hand hand) {
         // Return immediately if player is spectator or in creative
         PlayerEntity player = context.getPlayer();
-        if(player.isSpectator() || player.getAbilities().creativeMode)
+        if(player == null || player.isSpectator() || player.getAbilities().creativeMode)
             return;
 
         // Return immediately if inventory is empty, null or when current screen handler is null
@@ -38,14 +37,14 @@ public class HotbarReplace implements ClientModInitializer {
         if(inventory == null || inventory.isEmpty() || player.currentScreenHandler == null)
             return;
 
-        //Attempt to find a stack of matching items in the player's inventory
+        // Attempt to find a stack of matching items in the player's inventory
         ReplaceSlot(item, hand, player, inventory);
     }
 
     public static void tryReplaceSlot(ItemPlacementContext context, Item item, Hand hand) {
         // Return immediately if player is spectator or in creative
         PlayerEntity player = context.getPlayer();
-        if(player.isSpectator() || player.getAbilities().creativeMode)
+        if(player == null || player.isSpectator() || player.getAbilities().creativeMode)
             return;
 
         // Return immediately if inventory is empty, null or when current screen handler is null
@@ -59,25 +58,37 @@ public class HotbarReplace implements ClientModInitializer {
 
     private static void ReplaceSlot(Item lastPlacedItem, Hand hand, PlayerEntity player, PlayerInventory inventory) {
         for (int i = 0; i < player.currentScreenHandler.slots.size(); i++) {
-            if (player.currentScreenHandler.slots.get(i).getStack().isOf(lastPlacedItem)) {
+            ItemStack currentItemStack = player.currentScreenHandler.slots.get(i).getStack();
+            if (currentItemStack.isOf(lastPlacedItem)) {
+                // check if found item has same name as last used one
+                if (!currentItemStack.getName().getString().equals(lastPlacedItem.getName().getString())) {
+                    continue;
+                }
+                // check if found item is shulker box
+                if (currentItemStack.getItem() instanceof BlockItem blockItem && blockItem.getBlock() instanceof ShulkerBoxBlock) {
+                    continue;
+                }
                 // Simulate moving the stack from one slot to another
                 if (client != null) {
                     // TODO: This still feels like a bit of a hack
-                    // I honestly do not know Minecraft internals enough to be sure that there won't
-                    // be de-sync issues.
+                    // I honestly do not know Minecraft internals enough to be sure that there won't be de-sync issues.
 
                     int current_fps = client.getCurrentFps();
                     int click_delay = Math.round(1.0f / (float) current_fps) * 1000;
 
-                    client.interactionManager.clickSlot(player.currentScreenHandler.syncId, i, GLFW.GLFW_MOUSE_BUTTON_1,
-                            SlotActionType.PICKUP, player);
+                    if (client.interactionManager != null) {
+                        client.interactionManager.clickSlot(player.currentScreenHandler.syncId, i, GLFW.GLFW_MOUSE_BUTTON_1,
+                                SlotActionType.PICKUP, player);
+                    }
 
                     int slot = (hand == Hand.OFF_HAND ? 9 : inventory.selectedSlot);
 
                     scheduler.schedule(() -> {
-                        client.interactionManager.clickSlot(player.currentScreenHandler.syncId,
-                                slot + PlayerInventory.MAIN_SIZE, GLFW.GLFW_MOUSE_BUTTON_1,
-                                SlotActionType.PICKUP, player);
+                        if (client.interactionManager != null) {
+                            client.interactionManager.clickSlot(player.currentScreenHandler.syncId,
+                                    slot + PlayerInventory.MAIN_SIZE, GLFW.GLFW_MOUSE_BUTTON_1,
+                                    SlotActionType.PICKUP, player);
+                        }
                     }, click_delay, TimeUnit.MILLISECONDS);
                 }
 
